@@ -1,0 +1,10 @@
+body {
+  font-family: "Roboto", sans-serif;
+  overflow-x: hidden;
+  background-color: black;
+  color: white;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

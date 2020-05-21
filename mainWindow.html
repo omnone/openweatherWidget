@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
+    />
+    <link rel="stylesheet" type="text/css" href="./assets/style.css" />
+  </head>
+  <body style="-webkit-app-region: drag; padding: 10px;">
+    <h1 class="title" style="color: hsl(0, 0%, 96%);">
+      <span id="city"></span>
+    </h1>
+    <h2 class="subtitle" style="color: hsl(0, 0%, 96%);">
+      <span id="datetime"></span>
+    </h2>
+
+    <hr />
+
+    <div id="icon" style="float: right;">
+      <img id="wicon" src="" alt="Weather icon" />
+    </div>
+
+    <div class="modal is-active" id="waitModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title"></p>
+        </header>
+        <section class="modal-card-body">
+          <div>
+            <h2>Fetching openweather data, please wait..</h2>
+          </div>
+          <progress class="progress is-large is-info" max="100">30%</progress>
+        </section>
+        <footer class="modal-card-foot"></footer>
+      </div>
+    </div>
+
+    Temperature: <span id="temp"></span><br />
+    Humidity: <span id="humidity"></span><br />
+    Weather: <span id="weather"></span><br />
+
+    <script>
+      const electron = require("electron");
+      const { ipcRenderer } = electron;
+
+      //get and display weather data
+      ipcRenderer.on("weather-data", (event, data) => {
+        console.log(data);
+
+        document.getElementById("temp").innerHTML = data.main.temp + "&#8451;";
+        document.getElementById("humidity").innerHTML =
+          data.main.humidity + "%";
+        document.getElementById("weather").innerHTML =
+          data.weather[0].main + " (" + data.weather[0].description + ")";
+        document.getElementById("city").innerHTML = data.name;
+
+        let iconcode = data.weather[0].icon;
+        let iconurl = `https://openweathermap.org/img/wn/${iconcode}@2x.png`;
+
+        document.getElementById("wicon").src = iconurl;
+
+        let modal = document.getElementById("waitModal");
+        modal.classList.remove("is-active");
+      });
+
+      //get and display datetime
+      ipcRenderer.on("datetime", (event, data) => {
+        document.getElementById("datetime").innerHTML = data;
+      });
+    </script>
+  </body>
+</html>
