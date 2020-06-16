@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script
+      type="text/javascript"
+      src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.min.js"
+    ></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap"
       rel="stylesheet"
@@ -16,6 +20,7 @@
     <link rel="stylesheet" type="text/css" href="./assets/style.css" />
   </head>
   <body style="-webkit-app-region: drag; padding: 10px;">
+    <!-- City and Datatime -->
     <h1 class="title" style="color: hsl(0, 0%, 96%);">
       <span id="city"></span>
     </h1>
@@ -25,10 +30,30 @@
 
     <hr />
 
+    <!-- Google Calendar Api events  -->
+    <article
+      class="panel"
+      id="eventsPanel"
+      style="-webkit-app-region: no-drag;"
+    >
+      <p class="panel-heading">
+        <button class="button is-small" id="refreshEventsBtn">
+          <i class="fa fa-refresh" aria-hidden="true"></i>
+        </button>
+        Events:
+      </p>
+
+      <div id="events"></div>
+    </article>
+
+    <hr />
+
+    <!-- weather icon -->
     <div id="icon" style="float: right;">
       <img id="wicon" src="" alt="Weather icon" />
     </div>
 
+    <!-- loading modal  -->
     <div class="modal is-active" id="waitModal">
       <div class="modal-background"></div>
       <div class="modal-card">
@@ -45,6 +70,7 @@
       </div>
     </div>
 
+    <!-- weather data  -->
     Temperature: <span id="temp"></span><br />
     Humidity: <span id="humidity"></span><br />
     Weather: <span id="weather"></span><br />
@@ -55,13 +81,15 @@
 
       //get and display weather data
       ipcRenderer.on("weather-data", (event, data) => {
-        console.log(data);
-
-        document.getElementById("temp").innerHTML = data.main.temp + "&#8451;";
+        //temperature
+        document.getElementById("temp").innerHTML = `${data.main.temp}&#8451;(${data.main.feels_like}&#8451;)` ;
+        //humidity
         document.getElementById("humidity").innerHTML =
           data.main.humidity + "%";
+        //description
         document.getElementById("weather").innerHTML =
           data.weather[0].main + " (" + data.weather[0].description + ")";
+        //city
         document.getElementById("city").innerHTML = data.name;
 
         let iconcode = data.weather[0].icon;
@@ -69,13 +97,37 @@
 
         document.getElementById("wicon").src = iconurl;
 
-        let modal = document.getElementById("waitModal");
-        modal.classList.remove("is-active");
+        let waitModal = document.getElementById("waitModal");
+        waitModal.classList.remove("is-active");
       });
 
       //get and display datetime
       ipcRenderer.on("datetime", (event, data) => {
         document.getElementById("datetime").innerHTML = data;
+      });
+
+      //get and display events from Google Calendar
+      ipcRenderer.on("events-data", (event, events) => {
+        if (events.length > 0) {
+          events.map((event, i) => {
+            $("#events").append(`
+                  <a class="panel-block">
+                    ${event.datetime} - ${event.descr}
+                  </a>`);
+          });
+        } else {
+          $("#events").append(`No upcoming events found.`);
+        }
+      });
+
+      ipcRenderer.on("events-mess", (event, mess) => {
+        $("#events").append(`<li><a>${mess.mess}</a></li>`);
+      });
+
+      //Refresh events
+      $("#refreshEventsBtn").click(function () {
+        $("#events").empty();
+        ipcRenderer.send("get-events");
       });
     </script>
   </body>

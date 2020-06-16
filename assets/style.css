@@ -3,8 +3,21 @@ body {
   overflow-x: hidden;
   background-color: black;
   color: white;
+  height: 100%!important;
+  margin: 0;
+  padding: 0;
 }
 
 ::-webkit-scrollbar {
   display: none;
+}
+
+#eventsPanel .panel-block {
+  color: white !important;
+}
+
+#events {
+  overflow-y: scroll;
+  height: 130px;
+  padding: 1rem;
 }
