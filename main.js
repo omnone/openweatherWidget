@@ -6,18 +6,15 @@ const axios = require("axios");
 const { app, BrowserWindow, ipcMain } = electron;
 const fs = require("fs");
 const { google } = require("googleapis");
-// If modifying these scopes, delete token.json.
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
-// The file token.json stores the user's access and refresh tokens, and is
-// created automatically when the authorization flow completes for the first
-// time.
+
 const TOKEN_PATH = "token.json";
 
 let mainWindow;
-let city = "Patras";
 
 require("dotenv").config({ path: path.resolve(__dirname, "./.env") });
 
+let city = process.env.CITY;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function createMainWindow() {
   mainWindow = new BrowserWindow({
