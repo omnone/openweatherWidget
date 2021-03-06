@@ -1,5 +1,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 const electron = require("electron");
+const { Notification } = require("electron");
+const envfile = require("envfile");
 const url = require("url");
 const path = require("path");
 const axios = require("axios");
@@ -10,23 +12,29 @@ const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
 
 const TOKEN_PATH = "token.json";
 
+require("dotenv").config({
+  path: path.resolve(__dirname, "./.env"),
+});
+
 let mainWindow;
-
-require("dotenv").config({ path: path.resolve(__dirname, "./.env") });
-
+let events = [];
+let authUrl;
 let city = process.env.CITY;
+let minutesBeforeNotification = process.env.NOTIFICATION_INTERVAL;
+let isDev = process.env.ENV === "dev" ? true : false;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    frame: false,
-    width: 350,
-    height: 470,
-    x: 1560,
+    frame: isDev ? true : false,
+    width: 360,
+    height: isDev ? 510 : 467,
+    x: 1180,
     y: 0,
-    resizable: true,
-    fullscreenable: false,
+    resizable: isDev ? true : false,
+    fullscreenable: isDev ? true : false,
     opacity: 0.8,
-    skipTaskbar: true,
+    skipTaskbar: isDev ? false : true,
+    movable: true,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, "preload.js"),
@@ -52,11 +60,13 @@ function createMainWindow() {
 async function fetchWeather() {
   let response = await axios
     .get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&APPID=${process.env.OPENWEATHER_API_KEY}&units=metric`
     )
-    .catch((err) => console.log(err));
+    .catch((err) => {
+      mainWindow.webContents.send("error-occured", err.response.data.message);
+      console.log(err.response.data.message);
+    });
 
-  console.log(response.data);
 
   mainWindow.webContents.send("weather-data", response.data);
 }
@@ -78,6 +88,46 @@ function fetchDatetime() {
   mainWindow.webContents.send("datetime", datetime);
 }
 
+function eventNotify() {
+  for (let event of events) {
+    if (event.notified) return;
+
+    let dateEvent = new Date(event.datetime);
+    let hour12 = dateEvent.getHours() % 12;
+    if (!hour12) hour12 += 12;
+    let minute = dateEvent.getMinutes();
+
+    let dateNow = new Date();
+    let hour12Now = dateNow.getHours() % 12;
+    if (!hour12Now) hour12Now += 12;
+    let minuteNow = dateNow.getMinutes() + parseInt(minutesBeforeNotification);
+
+    if (parseInt(minuteNow) >= 59) {
+      minuteNow -= 59;
+      hour12Now += 1;
+    }
+
+    if (hour12 === hour12Now && minute <= minuteNow) {
+      new Notification({
+        title: "Upcoming Event",
+        body: `${event.datetime} - ${event.descr}`,
+      }).show();
+      event.notified = !event.notified;
+    }
+  }
+}
+
+async function authAndGetEvents() {
+  await fs.readFile("credentials.json", (err, content) => {
+    if (err) {
+      mainWindow.webContents.send("error-occured", err);
+      return console.log("Error loading credentials.json file:", err);
+    }
+    // Authorize a client with credentials, then call the Google Calendar API.
+    authorize(JSON.parse(content), listEvents);
+  });
+}
+
 setInterval(function () {
   fetchWeather();
 }, 60000);
@@ -86,6 +136,14 @@ setInterval(function () {
   fetchDatetime();
 }, 1000);
 
+setInterval(function () {
+  eventNotify();
+}, 20000);
+
+setInterval(function () {
+  authAndGetEvents();
+}, 600000);
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 app.on("ready", function () {
   createMainWindow();
@@ -93,12 +151,7 @@ app.on("ready", function () {
   mainWindow.webContents.on("did-finish-load", function () {
     fetchWeather();
     fetchDatetime();
-    // Load client secrets from a local file.
-    fs.readFile("credentials.json", (err, content) => {
-      if (err) return console.log("Error loading client secret file:", err);
-      // Authorize a client with credentials, then call the Google Calendar API.
-      authorize(JSON.parse(content), listEvents);
-    });
+    authAndGetEvents().then(eventNotify());
   });
 });
 
@@ -116,12 +169,41 @@ app.on("activate", function () {
 });
 
 ipcMain.on("get-events", (event) => {
-  // Load client secrets from a local file.
-  fs.readFile("credentials.json", (err, content) => {
-    if (err) return console.log("Error loading client secret file:", err);
-    // Authorize a client with credentials, then call the Google Calendar API.
-    authorize(JSON.parse(content), listEvents);
-  });
+  authAndGetEvents();
+});
+
+ipcMain.on("settings-changed", (event, data) => {
+
+  const sourcePath = ".env";
+
+  let parsedFile = envfile.parse(sourcePath);
+
+  parsedFile.CITY = data.city ? data.city : process.env.CITY;
+  parsedFile.OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
+  parsedFile.TIMEZONE = process.env.TIMEZONE;
+  parsedFile.ENV = process.env.ENV;
+  parsedFile.WORK_CALENDAR = process.env.WORK_CALENDAR;
+  parsedFile.NOTIFICATION_INTERVAL = data.minutes
+    ? data.minutes
+    : process.env.NOTIFICATION_INTERVAL;
+
+  fs.writeFileSync("./.env", envfile.stringify(parsedFile));
+
+  city = data.city ? data.city : process.env.CITY;
+  minutesBeforeNotification = data.minutes
+    ? data.minutes
+    : process.env.NOTIFICATION_INTERVAL;
+  fetchWeather();
+  eventNotify();
+});
+
+ipcMain.on("sign-in-google", () => {
+  electron.shell.openExternal(authUrl);
+});
+
+ipcMain.on("google-code", (event, code) => {
+  process.env.GOOGLE_CAL_KEY = code;
+  authAndGetEvents();
 });
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +225,9 @@ function authorize(credentials, callback) {
 
   // Check if we have previously stored a token.
   fs.readFile(TOKEN_PATH, (err, token) => {
-    if (err) return getAccessToken(oAuth2Client, callback);
+    if (err) {
+      return getAccessToken(oAuth2Client, callback);
+    }
     oAuth2Client.setCredentials(JSON.parse(token));
     callback(oAuth2Client);
   });
@@ -156,7 +240,7 @@ function authorize(credentials, callback) {
  * @param {getEventsCallback} callback The callback for the authorized client.
  */
 function getAccessToken(oAuth2Client, callback) {
-  const authUrl = oAuth2Client.generateAuthUrl({
+  authUrl = oAuth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
   });
@@ -165,17 +249,25 @@ function getAccessToken(oAuth2Client, callback) {
 
   if (!code) {
     mainWindow.webContents.send("events-mess", {
-      mess: "Authorize this app by visiting this url: " + authUrl,
+      mess:
+        "<button class='button is-primary' id='signInGoogle'>Sign in to Google <i class='fa fa-sign-in' aria-hidden='true'></i></button>",
     });
+
     return;
   }
 
   oAuth2Client.getToken(code, (err, token) => {
-    if (err) return console.error("Error retrieving access token", err);
+    if (err) {
+      mainWindow.webContents.send("error-occured", err);
+      return console.error("Error retrieving access token", err);
+    }
     oAuth2Client.setCredentials(token);
     // Store the token to disk for later program executions
     fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-      if (err) return console.error(err);
+      if (err) {
+        mainWindow.webContents.send("error-occured", err);
+        return console.error(err);
+      }
       console.log("Token stored to", TOKEN_PATH);
     });
     callback(oAuth2Client);
@@ -187,48 +279,96 @@ function getAccessToken(oAuth2Client, callback) {
  * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
  */
 function listEvents(auth) {
-  const calendar = google.calendar({ version: "v3", auth });
-  calendar.events.list(
-    {
-      calendarId: "primary",
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: "startTime",
-    },
-    (err, res) => {
-      if (err) return console.log("The API returned an error: " + err);
-      const events = res.data.items;
-      console.log(res.data);
-      if (events.length) {
-        let eventsData = [];
+  const calendar = google.calendar({
+    version: "v3",
+    auth,
+  });
 
-        console.log("Upcoming 10 events:");
-        events.map((event, i) => {
-          const start = event.start.dateTime || event.start.date;
+  const cals = [process.env.WORK_CALENDAR, "primary"];
 
-          let options = {
-              weekday: "long",
-              timeZone: `Europe/Athens`,
-              year: "numeric",
-              month: "numeric",
-              day: "numeric",
-              hour: "numeric",
-              minute: "numeric",
-            },
-            formatter = new Intl.DateTimeFormat([], options);
+  let today = new Date();
+  let dd = String(today.getDate()).padStart(2, "0");
+  let mm = String(today.getMonth() + 1).padStart(2, "0"); //January is 0!
+  let yyyy = today.getFullYear();
 
-          let datetime = formatter.format(new Date(start));
+  today = yyyy + "-" + mm + "-" + dd;
 
-          eventsData.push({ datetime: datetime, descr: event.summary });
-        });
+  for (let cal of cals) {
+    let eventsData = [];
 
-        console.log(eventsData);
-        mainWindow.webContents.send("events-data", eventsData);
+    calendar.events.list(
+      {
+        calendarId: cal,
+        timeMin: new Date().toISOString(),
+        timeMax: `${today}T23:59:00Z`,
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: "startTime",
+      },
+      (err, res) => {
+        if (err) {
+          mainWindow.webContents.send("error-occured", err);
+          return console.log("The API returned an error: " + err);
+        }
+
+        const events = res.data.items;
+
+        if (events.length) {
+          let datetime;
+
+          events.map((event, i) => {
+            const start = event.start.dateTime || event.start.date;
+
+            if (new Date() > new Date(start)) return;
+
+            let options = {
+                weekday: "long",
+                timeZone: process.env.TIMEZONE,
+                year: "numeric",
+                month: "numeric",
+                day: "numeric",
+                hour: "numeric",
+                minute: "numeric",
+              },
+              formatter = new Intl.DateTimeFormat([], options);
+
+            datetime = formatter.format(new Date(start));
+
+            eventsData.push({
+              datetime: datetime,
+              descr: event.summary,
+              notified: false,
+            });
+          });
+          return saveEvents(eventsData);
+        } else {
+          mainWindow.webContents.send("events-data", []);
+        }
+      }
+    );
+  }
+
+  function saveEvents(tmp) {
+    let newEvents = [];
+
+    for (let newEvent of tmp) {
+      let eventFound = events.find((event) => {
+        return newEvent.descr === event.descr;
+      });
+
+      if (eventFound) {
+        eventFound.notified =
+          eventFound.datetime !== newEvent.datetime
+            ? false
+            : eventFound.notified;
+        eventFound.datetime = newEvent.datetime;
       } else {
-        console.log("No upcoming events found.");
-        mainWindow.webContents.send("events-data", []);
+        newEvents.push(newEvent);
       }
     }
-  );
+
+    events.push(...newEvents);
+
+    mainWindow.webContents.send("events-data", tmp);
+  }
 }

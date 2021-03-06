@@ -1,134 +1,286 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <script
-      type="text/javascript"
-      src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.min.js"
-    ></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
-    />
-    <link rel="stylesheet" type="text/css" href="./assets/style.css" />
-  </head>
-  <body style="-webkit-app-region: drag; padding: 10px;">
-    <!-- City and Datatime -->
-    <h1 class="title" style="color: hsl(0, 0%, 96%);">
-      <span id="city"></span>
-    </h1>
-    <h2 class="subtitle" style="color: hsl(0, 0%, 96%);">
-      <span id="datetime"></span>
-    </h2>
 
-    <hr />
+<head>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css" />
+  <link rel="stylesheet" type="text/css" href="./assets/style.css" />
+</head>
 
-    <!-- Google Calendar Api events  -->
-    <article
-      class="panel"
-      id="eventsPanel"
-      style="-webkit-app-region: no-drag;"
-    >
-      <p class="panel-heading">
-        <button class="button is-small" id="refreshEventsBtn">
-          <i class="fa fa-refresh" aria-hidden="true"></i>
-        </button>
-        Events:
-      </p>
+<body style="-webkit-app-region: no-drag; padding: 10px;">
+  <!-- City and Datetime -->
+  <h1 class="title" style="color: hsl(0, 0%, 96%);">
+    <span id="city"></span>
+  </h1>
+  <span style="float:right;"><a style="color:white;" id="settings-btn"><i class="fa fa-wrench"
+        aria-hidden="true"></i></a>
+  </span>
+  <h2 class="subtitle" style="color: hsl(0, 0%, 96%);">
+    <span id="datetime"></span>
+  </h2>
 
-      <div id="events"></div>
-    </article>
+  <hr />
 
-    <hr />
+  <!-- Google Calendar Api events  -->
+  <article class="panel" id="eventsPanel" style="-webkit-app-region: no-drag;">
+    <p class="panel-heading">
+      <button class="button is-small" id="refreshEventsBtn">
+        <i class="fa fa-refresh " aria-hidden="true" id="refreshIcon"></i>
+      </button>
+      Today's Events:
+    </p>
+    <div id="events"></div>
+  </article>
 
-    <!-- weather icon -->
-    <div id="icon" style="float: right;">
-      <img id="wicon" src="" alt="Weather icon" />
+  <hr />
+
+  <div class="columns is-mobile">
+
+    <div class="column  is-9">
+      <!-- weather data  -->
+      Temperature: <span id="temp"></span><br />
+      Humidity: <span id="humidity"></span><br />
+      Weather: <span id="weather"></span><br />
     </div>
 
-    <!-- loading modal  -->
-    <div class="modal is-active" id="waitModal">
-      <div class="modal-background"></div>
-      <div class="modal-card">
-        <header class="modal-card-head">
-          <p class="modal-card-title"></p>
-        </header>
-        <section class="modal-card-body">
-          <div>
-            <h2>Fetching openweather data, please wait..</h2>
-          </div>
-          <progress class="progress is-large is-info" max="100">30%</progress>
-        </section>
-        <footer class="modal-card-foot"></footer>
+    <div class="column">
+      <!-- weather icon -->
+      <div id="icon">
+        <img id="wicon" src="" alt="Weather icon" />
       </div>
     </div>
+  </div>
 
-    <!-- weather data  -->
-    Temperature: <span id="temp"></span><br />
-    Humidity: <span id="humidity"></span><br />
-    Weather: <span id="weather"></span><br />
 
-    <script>
-      const electron = require("electron");
-      const { ipcRenderer } = electron;
+  <!-- loading modal  -->
+  <div class="modal is-active" id="waitModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title"></p>
+      </header>
+      <section class="modal-card-body">
+        <div>
+          <h2 style="color:black">Fetching Openweather data, please wait..</h2>
+        </div>
+        <progress class="progress is-large is-info" max="100">30%</progress>
+      </section>
+      <footer class="modal-card-foot"></footer>
+    </div>
+  </div>
 
-      //get and display weather data
-      ipcRenderer.on("weather-data", (event, data) => {
-        //temperature
-        document.getElementById("temp").innerHTML = `${data.main.temp}&#8451;(${data.main.feels_like}&#8451;)` ;
-        //humidity
-        document.getElementById("humidity").innerHTML =
-          data.main.humidity + "%";
-        //description
-        document.getElementById("weather").innerHTML =
-          data.weather[0].main + " (" + data.weather[0].description + ")";
-        //city
-        document.getElementById("city").innerHTML = data.name;
+  <!-- settings modal  -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Settings</p>
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">City Name</label>
+          <div class="control">
+            <input class="input" type="text" placeholder="" id="city-input">
+          </div>
+        </div>
 
-        let iconcode = data.weather[0].icon;
-        let iconurl = `https://openweathermap.org/img/wn/${iconcode}@2x.png`;
+        <div class="field">
+          <label class="label">Event Notification</label>
+          <div class="control">
+            <input class="input" type="number" placeholder="" id="event-notification">
+          </div>
+        </div>
 
-        document.getElementById("wicon").src = iconurl;
 
-        let waitModal = document.getElementById("waitModal");
-        waitModal.classList.remove("is-active");
+        <div class="field is-grouped">
+          <div class="control">
+            <button class="button is-link" id="save-btn">Save</button>
+          </div>
+          <div class="control">
+            <button class="button is-link is-light" id="cancel-btn">Cancel</button>
+          </div>
+      </section>
+      <footer class="modal-card-foot"></footer>
+    </div>
+  </div>
+
+  <!-- Error modal  -->
+  <div class="modal" id="errorModal" style="color:black">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="notification is-danger" id="errorModal">
+        <button class="delete"></button>
+        <div class="container">
+          <h2 id="errMess" style="overflow-wrap: break-word;">No credentials.</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const electron = require("electron");
+    const {
+      ipcRenderer
+    } = electron;
+
+    let waitModal = document.getElementById("waitModal");
+
+    setInterval(() => {
+      $("#events a").sort(function (a, b) {
+        return new Date(a.id) - new Date(b.id);
+      }).each(function () {
+        var elem = $(this);
+        elem.remove();
+        $(elem).appendTo("#events");
+      });
+    }, 1000);
+
+    function DateCompare(a, b) {
+      const dateA = a.datetime;
+      const dateB = b.datetime;
+
+      if (dateA > dateB) {
+        return 1;
+      } else if (dateA < dateB) {
+        return -1;
+      }
+    }
+
+
+    //get and display weather data
+    ipcRenderer.on("weather-data", (event, data) => {
+      //temperature
+      document.getElementById("temp").innerHTML = `${data.main.temp}&#8451;(${data.main.feels_like}&#8451;)`;
+      //humidity
+      document.getElementById("humidity").innerHTML =
+        data.main.humidity + "%";
+      //description
+      document.getElementById("weather").innerHTML =
+        data.weather[0].main + " (" + data.weather[0].description + ")";
+      //city and country
+      document.getElementById("city").innerHTML = `${data.name}, ${data.sys.country}`;
+
+      document.getElementById("city-input").value = data.name;
+
+      //weather icon
+      let iconcode = data.weather[0].icon;
+      let iconurl = `https://openweathermap.org/img/wn/${iconcode}@2x.png`;
+
+      document.getElementById("wicon").src = iconurl;
+
+      waitModal.classList.remove("is-active");
+    });
+
+    //display error
+    ipcRenderer.on("error-occured", (event, err) => {
+      let errorModal = document.getElementById("errorModal");
+      errorModal.classList.add("is-active");
+
+      document.getElementById('errMess').innerText = err;
+
+      waitModal.classList.remove("is-active");
+    })
+
+    //get and display datetime
+    ipcRenderer.on("datetime", (event, data) => {
+      document.getElementById("datetime").innerHTML = data;
+    });
+
+    //get and display events from Google Calendar
+    ipcRenderer.on("events-data", (event, events) => {
+
+      events.sort(function (a, b) {
+        // Turn your strings into dates, and then subtract them
+        // to get a value that is either negative, positive, or zero.
+        return new Date(a.datetime) - new Date(b.datetime);
       });
 
-      //get and display datetime
-      ipcRenderer.on("datetime", (event, data) => {
-        document.getElementById("datetime").innerHTML = data;
-      });
 
-      //get and display events from Google Calendar
-      ipcRenderer.on("events-data", (event, events) => {
-        if (events.length > 0) {
-          events.map((event, i) => {
-            $("#events").append(`
-                  <a class="panel-block">
-                    ${event.datetime} - ${event.descr}
-                  </a>`);
-          });
-        } else {
-          $("#events").append(`No upcoming events found.`);
-        }
-      });
-
-      ipcRenderer.on("events-mess", (event, mess) => {
-        $("#events").append(`<li><a>${mess.mess}</a></li>`);
-      });
-
-      //Refresh events
-      $("#refreshEventsBtn").click(function () {
+      if (events.length > 0) {
         $("#events").empty();
-        ipcRenderer.send("get-events");
+
+        events.map((event, i) => {
+          $("#events").append(
+            `<a class="panel-block" id="${event.datetime}"> ${event.datetime} - ${event.descr}</a>`);
+        });
+      }
+
+      const icon = document.getElementById('refreshIcon');
+
+      icon.classList.remove('fa-spin');
+      icon.classList.remove('fa-fw');
+    });
+
+    ipcRenderer.on("events-mess", (event, mess) => {
+      $("#events").append(`<a>${mess.mess}</a>`);
+    });
+
+    //Refresh events
+    $("#refreshEventsBtn").click(function () {
+      const icon = document.getElementById('refreshIcon');
+
+      icon.classList.add('fa-spin');
+      icon.classList.add('fa-fw');
+      $("#events").empty();
+      ipcRenderer.send("get-events");
+    });
+
+    $("#settings-btn").click(function () {
+      document.getElementById('settingsModal').classList.add('is-active')
+
+    });
+
+    $("#cancel-btn").click(function () {
+      document.getElementById('settingsModal').classList.remove('is-active')
+
+    });
+
+    $("#save-btn").click(function () {
+      const city = document.getElementById('city-input').value;
+      const minutes = document.getElementById('event-notification').value
+
+      document.getElementById('settingsModal').classList.remove('is-active')
+      ipcRenderer.send("settings-changed", {
+        city,
+        minutes
       });
-    </script>
-  </body>
+
+
+    });
+
+
+    $("#events").on('click', '#signInGoogle', function () {
+      ipcRenderer.send("sign-in-google");
+
+      $("#signInGoogle").remove();
+
+      $("#events").append(`
+
+        <div class="field has-addons" id="GoogleCodeForm">
+          <div class="control">
+            <input class="input"  id="googleCode" type="text" placeholder="Paste Google code here">
+          </div>
+          <div class="control">
+            <a class="button is-info">
+              Authorize
+            </a>
+          </div>
+        </div>`);
+    });
+
+    $("#events").on('click', '.is-info', function () {
+      code = $("#googleCode").val();
+      $("#GoogleCodeForm").remove();
+      ipcRenderer.send("google-code", code);
+    });
+
+
+
+    $("button.delete").on('click', function () {
+      document.getElementById('errorModal').classList.remove('is-active')
+    });
+  </script>
+</body>
+
 </html>

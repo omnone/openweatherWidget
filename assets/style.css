@@ -3,7 +3,7 @@ body {
   overflow-x: hidden;
   background-color: black;
   color: white;
-  height: 100%!important;
+  height: 100% !important;
   margin: 0;
   padding: 0;
 }
@@ -20,4 +20,12 @@ body {
   overflow-y: scroll;
   height: 130px;
   padding: 1rem;
+}
+
+#events a:hover {
+  color: black !important;
+}
+
+ul {
+  list-style-type: none !important;
 }
