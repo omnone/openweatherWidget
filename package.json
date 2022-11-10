@@ -14,7 +14,7 @@
   "dependencies": {
     "axios": "^0.21.2",
     "dotenv": "^8.2.0",
-    "electron": "^15.5.5",
+    "electron": "^18.3.7",
     "envfile": "^6.14.0",
     "googleapis": "^39.2.0",
     "node-fetch": "^2.6.7",
